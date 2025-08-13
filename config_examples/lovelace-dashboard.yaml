@@ -1,0 +1,215 @@
+# Configuração do Dashboard Lovelace para Broadlink IR Manager
+# Adicione esta configuração ao seu ui-lovelace.yaml ou configure via UI
+
+title: Broadlink IR Manager
+views:
+  - title: IR Manager
+    path: ir-manager
+    icon: mdi:remote
+    cards:
+      # Card principal do Broadlink IR Manager
+      - type: custom:broadlink-ir-card
+        entity: sensor.broadlink_ir_status
+        title: "Gerenciador IR"
+
+      # Card de status detalhado
+      - type: entities
+        title: "Status do Sistema"
+        entities:
+          - entity: sensor.broadlink_ir_status
+            name: "Status Principal"
+          - entity: sensor.ir_learning_status
+            name: "Status Learning"
+          - entity: sensor.broadlink_ir_last_code
+            name: "Último Código"
+          - entity: sensor.broadlink_ir_database
+            name: "Base de Dados"
+
+      # Card de controles rápidos
+      - type: horizontal-stack
+        cards:
+          - type: button
+            entity: button.start_ir_learning
+            name: "Iniciar Learning"
+            icon: mdi:play-circle
+            tap_action:
+              action: call-service
+              service: broadlink_ir_manager.start_learning
+              service_data:
+                entity_id: sensor.broadlink_ir_status
+                timeout: 30
+
+          - type: button
+            entity: button.stop_ir_learning
+            name: "Parar Learning"
+            icon: mdi:stop-circle
+            tap_action:
+              action: call-service
+              service: broadlink_ir_manager.stop_learning
+
+          - type: button
+            entity: button.get_learned_code
+            name: "Obter Código"
+            icon: mdi:download
+            tap_action:
+              action: call-service
+              service: broadlink_ir_manager.get_learned_code
+
+      # Card para entrada de dados
+      - type: entities
+        title: "Salvar Código IR"
+        entities:
+          - entity: input_text.ir_code_name
+          - entity: input_text.ir_device_name
+          - entity: input_text.ir_command_name
+          - entity: input_text.ir_code_notes
+          - type: button
+            name: "Salvar na Base de Dados"
+            icon: mdi:content-save
+            action_name: "SALVAR"
+            tap_action:
+              action: call-service
+              service: broadlink_ir_manager.save_code
+              service_data:
+                name: "{{ states('input_text.ir_code_name') }}"
+                device: "{{ states('input_text.ir_device_name') }}"
+                command: "{{ states('input_text.ir_command_name') }}"
+                base64_code: "{{ state_attr('sensor.broadlink_ir_last_code', 'base64_code') }}"
+                notes: "{{ states('input_text.ir_code_notes') }}"
+
+      # Card de códigos recentes
+      - type: markdown
+        title: "Último Código Capturado"
+        content: |
+          {% if state_attr('sensor.broadlink_ir_last_code', 'base64_code') %}
+          **Base64:**
+          ```
+          {{ state_attr('sensor.broadlink_ir_last_code', 'base64_code') }}
+          ```
+          
+          **Pronto Hex:**
+          ```
+          {{ state_attr('sensor.broadlink_ir_last_code', 'pronto_code') }}
+          ```
+          
+          **Frequência:** {{ state_attr('sensor.broadlink_ir_last_code', 'frequency') }} Hz
+          {% else %}
+          Nenhum código capturado ainda.
+          {% endif %}
+
+      # Card de estatísticas da base de dados
+      - type: glance
+        title: "Estatísticas da Base de Dados"
+        entities:
+          - entity: sensor.broadlink_ir_database
+            name: "Total de Códigos"
+          - entity: sensor.broadlink_ir_database
+            name: "Dispositivos"
+            attribute: total_devices
+
+      # Card de serviços avançados
+      - type: entities
+        title: "Serviços Avançados"
+        entities:
+          - entity: input_number.ir_learning_timeout
+          - type: button
+            name: "Listar Todos os Códigos"
+            icon: mdi:format-list-bulleted
+            action_name: "LISTAR"
+            tap_action:
+              action: call-service
+              service: broadlink_ir_manager.list_codes
+          - type: button
+            name: "Converter Código Atual"
+            icon: mdi:swap-horizontal
+            action_name: "CONVERTER"
+            tap_action:
+              action: call-service
+              service: broadlink_ir_manager.convert_code
+              service_data:
+                base64_code: "{{ state_attr('sensor.broadlink_ir_last_code', 'base64_code') }}"
+
+  # View para gerenciamento da base de dados
+  - title: Base de Dados
+    path: ir-database
+    icon: mdi:database
+    cards:
+      - type: markdown
+        title: "Códigos Salvos"
+        content: |
+          {% set codes = state_attr('sensor.broadlink_ir_database', 'recent_codes') %}
+          {% if codes %}
+          {% for code in codes %}
+          ### {{ code.name }}
+          - **Dispositivo:** {{ code.device }}
+          - **Comando:** {{ code.command }}
+          - **Criado em:** {{ code.created_at }}
+          
+          ---
+          {% endfor %}
+          {% else %}
+          Nenhum código salvo na base de dados.
+          {% endif %}
+
+      - type: entities
+        title: "Gerenciar Base de Dados"
+        entities:
+          - type: button
+            name: "Exportar Base de Dados"
+            icon: mdi:export
+            action_name: "EXPORTAR"
+            tap_action:
+              action: call-service
+              service: script.export_ir_database
+          - type: button
+            name: "Atualizar Estatísticas"
+            icon: mdi:refresh
+            action_name: "ATUALIZAR"
+            tap_action:
+              action: homeassistant.update_entity
+              target:
+                entity_id: sensor.broadlink_ir_database
+
+  # View para automações e scripts
+  - title: Automações
+    path: ir-automations
+    icon: mdi:robot
+    cards:
+      - type: entities
+        title: "Scripts Disponíveis"
+        entities:
+          - entity: script.start_ir_learning
+            name: "Iniciar Learning IR"
+          - entity: script.get_and_convert_ir_code
+            name: "Obter e Converter Código"
+          - entity: script.save_tv_power_code
+            name: "Salvar Código Power TV"
+
+      - type: markdown
+        title: "Exemplos de Uso"
+        content: |
+          ## Como usar o sistema:
+          
+          1. **Capturar código:**
+             - Clique em "Iniciar Learning"
+             - Aponte o controle remoto para o Broadlink
+             - Pressione o botão desejado
+             - Aguarde a confirmação
+          
+          2. **Salvar código:**
+             - Preencha os campos de nome, dispositivo e comando
+             - Clique em "Salvar na Base de Dados"
+          
+          3. **Usar códigos:**
+             - Os códigos ficam disponíveis em Base64 e Pronto Hex
+             - Use Base64 para enviar via Broadlink
+             - Use Pronto Hex para outros sistemas
+          
+          ## Formatos suportados:
+          - **Base64:** Formato nativo do Broadlink
+          - **Pronto Hex:** Formato universal (0000 xxxx...)
+          
+          ## Frequências suportadas:
+          - 38kHz (padrão para maioria dos dispositivos)
+          - Outras frequências detectadas automaticamente
+

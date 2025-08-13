@@ -1,0 +1,180 @@
+# Configuração do Home Assistant para Broadlink IR Manager
+# Adicione estas linhas ao seu configuration.yaml
+
+# Configuração básica do Home Assistant
+homeassistant:
+  name: Casa
+  latitude: !secret home_latitude
+  longitude: !secret home_longitude
+  elevation: 0
+  unit_system: metric
+  time_zone: America/Sao_Paulo
+  customize: !include customize.yaml
+
+# Configuração do Broadlink (integração nativa)
+# Esta integração será detectada automaticamente ou configurada via UI
+broadlink:
+
+# Configuração do componente customizado Broadlink IR Manager
+# Opcional: configuração via YAML (também pode ser feito via UI)
+broadlink_ir_manager:
+  # host: 192.168.1.100  # IP do seu Broadlink RM Mini 3
+  # mac: "34:ea:34:xx:xx:xx"  # MAC address do dispositivo
+  # timeout: 30  # Timeout para modo learning em segundos
+
+# Configuração de recursos para custom cards
+lovelace:
+  mode: yaml
+  resources:
+    - url: /local/broadlink-ir-card.js
+      type: module
+
+# Automações para notificações de códigos IR
+automation:
+  - alias: "Notificar código IR capturado"
+    trigger:
+      - platform: event
+        event_type: broadlink_ir_manager_code_learned
+    action:
+      - service: notify.persistent_notification
+        data:
+          title: "Código IR Capturado"
+          message: "Novo código IR foi capturado com sucesso!"
+          notification_id: "ir_code_captured"
+
+  - alias: "Notificar código IR salvo"
+    trigger:
+      - platform: event
+        event_type: broadlink_ir_manager_code_saved
+    action:
+      - service: notify.persistent_notification
+        data:
+          title: "Código IR Salvo"
+          message: "Código '{{ trigger.event.data.name }}' foi salvo na base de dados"
+          notification_id: "ir_code_saved"
+
+# Scripts para facilitar o uso
+script:
+  # Script para iniciar learning com timeout personalizado
+  start_ir_learning:
+    alias: "Iniciar Learning IR"
+    sequence:
+      - service: broadlink_ir_manager.start_learning
+        data:
+          entity_id: sensor.broadlink_ir_status
+          timeout: 30
+
+  # Script para obter e converter código
+  get_and_convert_ir_code:
+    alias: "Obter e Converter Código IR"
+    sequence:
+      - service: broadlink_ir_manager.get_learned_code
+      - delay: "00:00:02"
+      - service: broadlink_ir_manager.convert_code
+        data:
+          base64_code: "{{ states.sensor.broadlink_ir_last_code.attributes.base64_code }}"
+
+  # Script para salvar código com dados pré-definidos
+  save_tv_power_code:
+    alias: "Salvar Código Power TV"
+    sequence:
+      - service: broadlink_ir_manager.save_code
+        data:
+          name: "Power"
+          device: "TV Sala"
+          command: "power"
+          base64_code: "{{ states.sensor.broadlink_ir_last_code.attributes.base64_code }}"
+          notes: "Código de ligar/desligar TV"
+
+# Sensores template para facilitar automações
+sensor:
+  - platform: template
+    sensors:
+      ir_learning_status:
+        friendly_name: "Status Learning IR"
+        value_template: >
+          {% if is_state('sensor.broadlink_ir_status', 'learning') %}
+            Capturando
+          {% elif is_state('sensor.broadlink_ir_status', 'code_received') %}
+            Código Recebido
+          {% else %}
+            Pronto
+          {% endif %}
+        icon_template: >
+          {% if is_state('sensor.broadlink_ir_status', 'learning') %}
+            mdi:record-rec
+          {% elif is_state('sensor.broadlink_ir_status', 'code_received') %}
+            mdi:check-circle
+          {% else %}
+            mdi:remote
+          {% endif %}
+
+      ir_last_code_info:
+        friendly_name: "Último Código IR"
+        value_template: >
+          {% if states.sensor.broadlink_ir_last_code.attributes.base64_code %}
+            Código disponível
+          {% else %}
+            Nenhum código
+          {% endif %}
+        attribute_templates:
+          base64_preview: >
+            {% if states.sensor.broadlink_ir_last_code.attributes.base64_code %}
+              {{ states.sensor.broadlink_ir_last_code.attributes.base64_code[:20] }}...
+            {% else %}
+              N/A
+            {% endif %}
+          pronto_preview: >
+            {% if states.sensor.broadlink_ir_last_code.attributes.pronto_code %}
+              {{ states.sensor.broadlink_ir_last_code.attributes.pronto_code[:30] }}...
+            {% else %}
+              N/A
+            {% endif %}
+
+# Input helpers para interface
+input_text:
+  ir_code_name:
+    name: "Nome do Código IR"
+    max: 50
+    
+  ir_device_name:
+    name: "Nome do Dispositivo"
+    max: 50
+    
+  ir_command_name:
+    name: "Nome do Comando"
+    max: 50
+    
+  ir_code_notes:
+    name: "Notas do Código"
+    max: 200
+
+input_number:
+  ir_learning_timeout:
+    name: "Timeout Learning (segundos)"
+    min: 5
+    max: 300
+    step: 5
+    initial: 30
+
+# Grupos para organizar entidades
+group:
+  broadlink_ir_controls:
+    name: "Controles IR"
+    entities:
+      - sensor.broadlink_ir_status
+      - sensor.broadlink_ir_last_code
+      - sensor.broadlink_ir_database
+      - button.start_ir_learning
+      - button.stop_ir_learning
+      - button.get_learned_code
+
+  broadlink_ir_inputs:
+    name: "Entrada de Dados IR"
+    entities:
+      - input_text.ir_code_name
+      - input_text.ir_device_name
+      - input_text.ir_command_name
+      - input_text.ir_code_notes
+      - input_number.ir_learning_timeout
+

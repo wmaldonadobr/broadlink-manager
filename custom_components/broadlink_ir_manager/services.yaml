@@ -1,0 +1,90 @@
+start_learning:
+  name: Start IR Learning
+  description: Inicia o modo de aprendizado de códigos IR
+  fields:
+    entity_id:
+      name: Entity ID
+      description: ID da entidade do sensor
+      required: true
+      selector:
+        entity:
+          domain: sensor
+    timeout:
+      name: Timeout
+      description: Tempo limite em segundos para o modo learning
+      default: 30
+      selector:
+        number:
+          min: 5
+          max: 300
+          unit_of_measurement: seconds
+
+stop_learning:
+  name: Stop IR Learning
+  description: Para o modo de aprendizado de códigos IR
+
+get_learned_code:
+  name: Get Learned Code
+  description: Obtém o último código IR aprendido
+
+convert_code:
+  name: Convert IR Code
+  description: Converte código Base64 para formato Pronto Hex
+  fields:
+    base64_code:
+      name: Base64 Code
+      description: Código IR em formato Base64
+      required: true
+      selector:
+        text:
+
+save_code:
+  name: Save IR Code
+  description: Salva código IR na base de dados
+  fields:
+    name:
+      name: Name
+      description: Nome descritivo do código
+      required: true
+      selector:
+        text:
+    device:
+      name: Device
+      description: Nome do dispositivo
+      required: true
+      selector:
+        text:
+    command:
+      name: Command
+      description: Nome do comando
+      required: true
+      selector:
+        text:
+    base64_code:
+      name: Base64 Code
+      description: Código IR em formato Base64
+      required: true
+      selector:
+        text:
+    notes:
+      name: Notes
+      description: Notas adicionais sobre o código
+      selector:
+        text:
+          multiline: true
+
+delete_code:
+  name: Delete IR Code
+  description: Remove código IR da base de dados
+  fields:
+    code_id:
+      name: Code ID
+      description: ID do código a ser removido
+      required: true
+      selector:
+        text:
+
+list_codes:
+  name: List IR Codes
+  description: Lista todos os códigos IR salvos na base de dados
+
